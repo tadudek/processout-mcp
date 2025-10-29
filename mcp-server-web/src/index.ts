@@ -50,6 +50,13 @@ export const SERVER_VERSION = "1.0.3";
 export const API_BASE_URL = "https://api.processout.com";
 
 /**
+ * Request timeout configuration (in milliseconds)
+ * Can be overridden via API_TIMEOUT_MS environment variable
+ * Default: 60000 (60 seconds)
+ */
+const API_TIMEOUT_MS = parseInt(process.env.API_TIMEOUT_MS || '60000', 10) || 60000;
+
+/**
  * MCP Server instance
  */
 const server = new Server(
@@ -390,7 +397,7 @@ async function acquireOAuth2Token(schemeName: string, scheme: any): Promise<stri
         
         console.error(`Requesting OAuth2 token from ${tokenUrl}`);
         
-        // Make the token request
+        // Make the token request with timeout
         const response = await axios({
             method: 'POST',
             url: tokenUrl,
@@ -398,7 +405,8 @@ async function acquireOAuth2Token(schemeName: string, scheme: any): Promise<stri
                 'Content-Type': 'application/x-www-form-urlencoded',
                 'Authorization': `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`
             },
-            data: formData.toString()
+            data: formData.toString(),
+            timeout: API_TIMEOUT_MS
         });
         
         // Process the response
@@ -655,11 +663,12 @@ async function executeApiTool(
       url: requestUrl, 
       params: queryParams, 
       headers: headers,
+      timeout: API_TIMEOUT_MS,
       ...(requestBodyData !== undefined && { data: requestBodyData }),
     };
 
     // Log request info to stderr (doesn't affect MCP output)
-    console.error(`Executing tool "${toolName}": ${config.method} ${config.url}`);
+    console.error(`Executing tool "${toolName}": ${config.method} ${config.url} (timeout: ${API_TIMEOUT_MS}ms)`);
     
     // Execute the request
     const response = await axios(config);
@@ -764,6 +773,12 @@ main().catch((error) => {
  */
 function formatApiError(error: AxiosError): string {
     let message = 'API request failed.';
+    
+    // Check for timeout errors first
+    if (error.code === 'ECONNABORTED' || error.message?.toLowerCase().includes('timeout')) {
+        return `API Request Timeout: The request exceeded the configured timeout of ${API_TIMEOUT_MS}ms. The server may be slow or unresponsive.`;
+    }
+    
     if (error.response) {
         message = `API Error: Status ${error.response.status} (${error.response.statusText || 'Status text not available'}). `;
         const responseData = error.response.data;
@@ -785,6 +800,7 @@ function formatApiError(error: AxiosError): string {
     } else if (error.request) {
         message = 'API Network Error: No response received from server.';
         if (error.code) message += ` (Code: ${error.code})`;
+        if (error.message) message += ` Message: ${error.message}`;
     } else { 
         message += `API Request Setup Error: ${error.message}`; 
     }
