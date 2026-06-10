@@ -354,3 +354,36 @@ Local/ngrok end-to-end success later on June 10, 2026:
 This proves the local server plus ngrok public return/webhook origin can run a
 full hosted Mercado Pago checkout and receive the real ProcessOut capture
 webhook back on the local machine.
+
+## Switching demo ProcessOut projects
+
+The demo app reads the active public ProcessOut project ID from
+`DEMO_PROCESSOUT_PROJECT_ID`.
+
+Local behavior in `/Users/tim/processout-wallet-demo`:
+
+- `.env` is loaded first.
+- `.env.local` is loaded second and overrides `.env`.
+- Put the active local project ID in `.env.local`:
+
+```text
+DEMO_PROCESSOUT_PROJECT_ID=test-proj_...
+```
+
+Then restart:
+
+```bash
+npm run dev:local
+```
+
+The user's ProcessOut key is valid across the sandbox, so project switching only
+requires changing `DEMO_PROCESSOUT_PROJECT_ID` unless a future key has narrower
+scope.
+
+Vercel behavior:
+
+- The published project `tim-cirsiumlabs/procesout_demo` has
+  `DEMO_PROCESSOUT_PROJECT_ID` configured for Production and Preview.
+- To switch the published demo, update the Vercel
+  `DEMO_PROCESSOUT_PROJECT_ID` environment variable and redeploy.
+- Confirm with protected `/demo-config`; it returns the active `projectId`.
